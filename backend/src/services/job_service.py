@@ -10,12 +10,38 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from arq.jobs import DeserializationError
 from arq.jobs import Job as ArqJob
+
 from core.cache import LRUCache
 from core.config import Settings, get_app_settings
 from schemas.job import ColorStatistics, Job, JobCreate, JobStatus, JobsTimeStatistics
 
 settings: Settings = get_app_settings()
 
+import io
+import pickle
+from typing import Any
+
+
+class MockClass:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        self.__dict__.update(kwargs)
+
+    def __getattr__(self, name):
+        return None
+
+
+class FlexibleUnpickler(pickle.Unpickler):
+    def find_class(self, module_name: str, name: str):
+        try:
+            return super().find_class(module_name, name)
+        except (ImportError, AttributeError, ModuleNotFoundError):
+            return MockClass
+
+
+def flexible_pickle_deserializer(data: bytes) -> dict[str, Any]:
+    return FlexibleUnpickler(io.BytesIO(data)).load()
 
 class JobService:
     """Service class for interacting with Arq jobs."""
@@ -64,7 +90,7 @@ class JobService:
                 complete_key: str = arq.constants.result_key_prefix + key_id_without_prefix
                 redis_raw = await redis.get(complete_key)
                 try:
-                    job_result: arq.jobs.JobResult = arq.jobs.deserialize_result(redis_raw)
+                    job_result: arq.jobs.JobResult = arq.jobs.deserialize_result(redis_raw, deserializer=flexible_pickle_deserializer)
                 except DeserializationError:
                     self.logger.exception("Error deserializing job result")
                     return None
@@ -92,7 +118,7 @@ class JobService:
             else:
                 keys_queued_job = arq.constants.job_key_prefix + key_id_without_prefix
                 redis_raw = await redis.get(keys_queued_job)
-                job: arq.jobs.JobDef = arq.jobs.deserialize_job(redis_raw)
+                job: arq.jobs.JobDef = arq.jobs.deserialize_job(redis_raw, deserializer=flexible_pickle_deserializer)
                 job_schema = Job(
                     id=key_id_without_prefix,
                     enqueue_time=job.enqueue_time.replace(tzinfo=ZoneInfo(settings.timezone)),
