@@ -8,7 +8,6 @@ import arq.constants
 import arq.jobs
 from arq import create_pool
 from arq.connections import RedisSettings
-from arq.jobs import DeserializationError
 from arq.jobs import Job as ArqJob
 
 from core.cache import LRUCache
@@ -94,8 +93,8 @@ class JobService:
                 redis_raw = await redis.get(complete_key)
                 try:
                     job_result: arq.jobs.JobResult = arq.jobs.deserialize_result(redis_raw, deserializer=flexible_pickle_deserializer)
-                except DeserializationError:
-                    self.logger.exception("Error deserializing job result")
+                except Exception:
+                    self.logger.exception("Error deserializing job result: {e}")
                     return None
 
                 job_schema = Job(
