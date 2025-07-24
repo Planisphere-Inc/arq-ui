@@ -38,7 +38,11 @@ class FlexibleUnpickler(pickle.Unpickler):
 
 
 def flexible_pickle_deserializer(data: bytes) -> dict[str, Any]:
-    return FlexibleUnpickler(io.BytesIO(data)).load()
+    try:
+        return FlexibleUnpickler(io.BytesIO(data)).load()
+    except Exception as e:
+        print(f"Error deserializing data: {e}")
+        raise e
 
 class JobService:
     """Service class for interacting with Arq jobs."""
