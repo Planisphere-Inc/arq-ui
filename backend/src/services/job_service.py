@@ -21,6 +21,8 @@ import io
 import pickle
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 
 class MockClass:
     def __init__(self, *args, **kwargs):
@@ -41,7 +43,7 @@ def flexible_pickle_deserializer(data: bytes) -> dict[str, Any]:
     try:
         return FlexibleUnpickler(io.BytesIO(data)).load()
     except Exception as e:
-        print(f"Error deserializing data: {e}")
+        logger.error(f"Error deserializing data: {e}")
         raise e
 
 class JobService:
