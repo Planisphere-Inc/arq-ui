@@ -28,9 +28,6 @@ class MockClass:
         self.kwargs = kwargs
         self.__dict__.update(kwargs)
 
-    def __getattr__(self, name):
-        return None
-
 
 class FlexibleUnpickler(pickle.Unpickler):
     def find_class(self, module_name: str, name: str):
